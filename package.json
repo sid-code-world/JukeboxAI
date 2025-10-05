@@ -1,15 +1,22 @@
 {
-"name": "music-server",
-"version": "1.0.0",
-"description": "A simple Node.js server to host the music player.",
-"main": "server.js",
-"scripts": {
-"start": "node server.js"
-},
-"keywords": [],
-"author": "",
-"license": "ISC",
-"dependencies": {
-"express": "^4.19.2"
-}
+  "name": "music-server",
+  "version": "1.0.0",
+  "description": "A Node.js server with SQLite backend for the music player.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "tonejs",
+    "express",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "cors": "^2.8.5"
+  }
 }

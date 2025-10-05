@@ -3,441 +3,554 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Track Musical Player</title>
-    <!-- Use Tailwind CSS for styling -->
+    <title>Multi-Track Music Player</title>
+    <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Use the Inter font for a clean look -->
-    <style>
-        body { font-family: "Inter", sans-serif; }
-    </style>
-    <!-- Import Tone.js library for audio synthesis -->
+    <!-- Load Tone.js for music synthesis -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* Custom styles for aesthetic enhancements */
+        body { font-family: 'Inter', sans-serif; background-color: #1a1a2e; color: #ffffff; }
+        .card { background-color: #2c2a52; border: 1px solid #4a488e; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); transition: transform 0.1s ease; }
+        .card:hover { transform: translateY(-2px); }
+        .btn-primary { background-color: #ff6b6b; border: 1px solid #ee5253; transition: background-color 0.1s; }
+        .btn-primary:hover { background-color: #ff9b9b; }
+        .btn-secondary { background-color: #48c4a4; border: 1px solid #3c9c84; }
+        .btn-secondary:hover { background-color: #6ee6c7; }
+        .btn-danger { background-color: #e55039; border: 1px solid #cc4030; }
+        .btn-danger:hover { background-color: #ff6f5b; }
+        .input-style { background-color: #3e3d64; border-color: #5d5c8d; color: #ffffff; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #ff6b6b; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Style for the "Experimental" tag */
+        .experimental-tag { background-color: #5D5FEF; color: white; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; margin-left: 8px; }
+        /* Style for the track notation area */
+        .notation-area { height: 100px; resize: none; }
+    </style>
 </head>
-<body class="bg-gray-900">
-    <div id="app" class="flex flex-col items-center min-h-screen p-4 text-white">
-        <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-xl p-8 space-y-8 border border-gray-700">
-            <h1 class="text-4xl font-extrabold text-center text-indigo-400">
-                Multi-Track Musical Player 🎵
-            </h1>
-            <p class="text-center text-gray-400">
-                Create your own orchestra by adding multiple instrument tracks.
-            </p>
+<body class="p-4 md:p-8 min-h-screen">
 
-            <!-- Playback Controls and Tempo -->
-            <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-8">
-                <div class="flex items-center space-x-2">
-                    <label for="tempoInput" class="text-gray-400">Tempo (BPM):</label>
-                    <input
-                        type="number"
-                        id="tempoInput"
-                        value="100"
-                        min="40"
-                        max="240"
-                        class="w-24 p-2 text-center bg-gray-700 text-gray-200 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-                    >
-                </div>
-                <button
-                    id="playButton"
-                    class="px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 bg-indigo-500 hover:bg-indigo-600 focus:ring-indigo-500"
-                >
-                    Play All
-                </button>
-            </div>
+    <header class="text-center mb-10">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-[#ff6b6b]">Tone.js Composer</h1>
+        <p class="text-lg text-gray-300 mt-2">Create and save your multi-track musical ideas (SQLite Server).</p>
+    </header>
 
-            <!-- Tracks Container -->
-            <div id="tracksContainer" class="space-y-6">
-                <!-- Instrument tracks will be dynamically added here -->
-            </div>
+    <!-- Controls & Actions -->
+    <div class="flex flex-wrap gap-4 mb-8 justify-center">
+        <button id="start-btn" onclick="Tone.start(); startTransport();"
+                class="btn-primary px-8 py-3 rounded-xl font-bold text-lg hover:shadow-lg disabled:opacity-50" disabled>
+            <span id="start-text">Loading Instruments...</span>
+            <span id="loader-icon" class="loader inline-block ml-2"></span>
+        </button>
 
-            <!-- Add Track Button -->
-            <div class="flex justify-center mt-6">
-                <button
-                    id="addTrackButton"
-                    class="px-6 py-2 rounded-lg font-bold text-gray-200 shadow-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 bg-gray-700 hover:bg-gray-600 focus:ring-gray-500"
-                >
-                    + Add Track
-                </button>
-            </div>
+        <button id="stop-btn" onclick="stopTransport()"
+                class="btn-danger px-8 py-3 rounded-xl font-bold text-lg hover:shadow-lg" disabled>
+            Stop
+        </button>
 
-            <!-- Status message area -->
-            <div id="messageDisplay" class="text-center text-sm font-medium text-gray-400 mt-4">
-                Click "Add Track" to begin composing!
-            </div>
-            <!-- Loading indicator for instruments -->
-            <div id="loadingIndicator" class="text-center text-lg font-bold text-indigo-400 mt-4 hidden">
-                Loading instruments... Please wait.
-            </div>
+        <select id="add-instrument" onchange="addTrack(this.value); this.value=''"
+                class="input-style px-6 py-3 rounded-xl font-bold text-lg appearance-none cursor-pointer">
+            <option value="" disabled selected>+ Add Track</option>
+            <option value="Piano">Piano (Sampled)</option>
+            <option value="Drums">Drums (Sampled)</option>
+            <option value="Gong">Gong (Sampled)</option>
+            <option value="Synth">Synth (Experimental)</option>
+            <option value="Violin">Violin (Experimental)</option>
+            <option value="Cello">Cello (Experimental)</option>
+            <option value="Flute">Flute (Experimental)</option>
+            <option value="Organ">Organ (Sampled)</option>
+        </select>
+    </div>
+
+    <!-- Save/Load Section -->
+    <div class="card p-6 rounded-xl mb-8 max-w-2xl mx-auto">
+        <h2 class="text-2xl font-semibold mb-4 text-[#48c4a4]">Save & Load Tracks (via Node.js API)</h2>
+        <div id="save-load-controls" class="flex flex-col sm:flex-row gap-4">
+            <input type="text" id="composition-name" placeholder="Name your composition (e.g., 'My Groovy Beat')"
+                   class="input-style flex-grow p-3 rounded-lg">
+            <button id="save-btn" onclick="saveComposition()"
+                    class="btn-secondary px-6 py-3 rounded-lg font-semibold">
+                Save Composition
+            </button>
+            <button id="load-btn" onclick="loadCompositions()"
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold">
+                Load List
+            </button>
+        </div>
+        <div id="load-list-container" class="mt-4 hidden max-h-40 overflow-y-auto">
+            <!-- Compositions will be listed here -->
+            <p class="text-gray-400">Press 'Load List' to fetch saved compositions from the server.</p>
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            // === DOM Elements ===
-            const tempoInput = document.getElementById('tempoInput');
-            const playButton = document.getElementById('playButton');
-            const tracksContainer = document.getElementById('tracksContainer');
-            const addTrackButton = document.getElementById('addTrackButton');
-            const messageDisplay = document.getElementById('messageDisplay');
-            const loadingIndicator = document.getElementById('loadingIndicator');
+    <!-- Tracks Container -->
+    <div id="tracks-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Track cards will be dynamically inserted here -->
+    </div>
 
-            // === State Variables ===
-            let isPlaying = false;
-            let trackIndex = 0;
-            const instruments = {}; // Stores Tone.js instruments keyed by their ID
+    <!-- Application Logic -->
+    <script type="module">
+        // ----------------------------------------------------------------------
+        // 1. DATA PERSISTENCE (Node.js API Integration)
+        // ----------------------------------------------------------------------
+        const API_BASE_URL = 'http://localhost:3001/api/compositions';
 
-            // Sampler presets for more realistic sounds
-            const samplers = {};
-            
-            // Define all instruments to be loaded upfront
-            const instrumentTypes = {
-                'Synth': 'Synth',
-                'Piano': 'Sampler',
-                'Drums': 'Sampler',
-                'Violin': 'Synth',
-                'Cello': 'Synth', // Changed to Synth for reliability
-                'Flute': 'Synth', // Changed to Synth for reliability
-                'Organ': 'Sampler',
-                'Gong': 'Sampler'
+        /**
+         * Gathers all track data from the UI and sends it to the Node.js server
+         * via a POST request to be saved in the SQLite database.
+         */
+        window.saveComposition = async () => {
+            const nameInput = document.getElementById('composition-name');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                // In a real app, use a modal, but for now, use console warning
+                console.warn('Please enter a name for your composition.');
+                return;
+            }
+
+            // 1. Gather all track data from the global array and input fields
+            const tracksData = window.tracks.map(track => ({
+                id: track.id, 
+                instrumentType: track.instrumentType,
+                instrumentName: track.instrumentName,
+                // Read current values from the UI elements
+                notation: document.getElementById(`notation-${track.id}`).value,
+                volume: document.getElementById(`volume-${track.id}`).value,
+            }));
+
+            const dataToSave = {
+                name: name,
+                // Convert the complex array of tracks into a single JSON string 
+                // for storage in the SQLite TEXT column.
+                tracks: JSON.stringify(tracksData), 
             };
 
-            // Pre-defined melodies for each instrument
-            const defaultMelodies = {
-                'Synth': 'C4/4n, E4/4n, G4/4n, C5/4n',
-                'Piano': 'C4/4n, G4/4n, A4/4n, G4/4n, F4/4n, E4/4n, D4/4n, C4/4n',
-                'Drums': 'C1/8n, D#1/8n, F#1/8n, D#1/8n, C1/8n, D#1/8n, F#1/8n, D#1/8n',
-                'Violin': 'C4/2n, G4/2n, C5/4n, G4/4n, E4/4n, C4/4n',
-                'Cello': 'C2/2n, G2/2n, E2/2n, C2/2n',
-                'Flute': 'C5/4n, D5/4n, E5/4n, F5/4n, G5/4n',
-                'Organ': 'C3/4n, F3/4n, A3/4n, F3/4n, C3/4n',
-                'Gong': 'C2/1m' // Special notation for the gong sound
-            };
+            const saveButton = document.getElementById('save-btn');
+            const originalText = saveButton.textContent;
+            saveButton.textContent = 'Saving...';
+            saveButton.disabled = true;
 
-            // === Instrument Loading ===
-            // This section pre-loads all Sampler instruments to prevent "buffer not loaded" errors.
-            const createSamplers = async () => {
-                loadingIndicator.classList.remove('hidden');
-                playButton.disabled = true;
-                addTrackButton.disabled = true;
-
-                const promises = [];
-
-                // Create and load all samplers
-                samplers.Piano = new Tone.Sampler({
-                    urls: {
-                        "C3": "C3.mp3", "C4": "C4.mp3", "C5": "C5.mp3", "C6": "C6.mp3",
-                    },
-                    release: 1,
-                    baseUrl: "https://tonejs.github.io/audio/salamander/",
-                }).toDestination();
-                promises.push(samplers.Piano.loaded);
-                
-                samplers.Drums = new Tone.Sampler({
-                    urls: {
-                        "C1": "https://tonejs.github.io/audio/drum-samples/acoustic-kit/kick.mp3",
-                        "D#1": "https://tonejs.github.io/audio/drum-samples/acoustic-kit/snare.mp3",
-                        "F#1": "https://tonejs.github.io/audio/drum-samples/acoustic-kit/hihat.mp3",
-                    },
-                    release: 1,
-                }).toDestination();
-                promises.push(samplers.Drums.loaded);
-                
-                // Cello and Flute changed to Synth, so no sampler loading is needed for them.
-                
-                samplers.Organ = new Tone.Sampler({
-                    urls: {
-                        "C3": "C3.mp3", "F3": "F3.mp3", "A3": "A3.mp3", "C4": "C4.mp3",
-                    },
-                    release: 1,
-                    baseUrl: "https://tonejs.github.io/audio/salamander/",
-                }).toDestination();
-                promises.push(samplers.Organ.loaded);
-
-                samplers.Gong = new Tone.Sampler({
-                    urls: { "C2": "gong_1.mp3" },
-                    release: 1,
-                    baseUrl: "https://tonejs.github.io/audio/percussion/",
-                }).toDestination();
-                promises.push(samplers.Gong.loaded);
-
-                await Promise.all(promises);
-
-                loadingIndicator.classList.add('hidden');
-                playButton.disabled = false;
-                addTrackButton.disabled = false;
-                messageDisplay.textContent = 'Instruments loaded. Click "Add Track" to begin composing!';
-            };
-
-            // Function to get a pre-loaded or new instrument instance
-            const getInstrument = (type) => {
-                if (instrumentTypes[type] === 'Sampler') {
-                    // Return the pre-loaded sampler instance
-                    return samplers[type];
-                } else if (instrumentTypes[type] === 'Synth') {
-                    // Create a new synth instance
-                    return new Tone.PolySynth(Tone.Synth).toDestination();
-                }
-            };
-            
-            // === UI and State Functions ===
-            const updateUI = () => {
-                playButton.textContent = isPlaying ? 'Stop All' : 'Play All';
-                playButton.classList.toggle('bg-red-500', isPlaying);
-                playButton.classList.toggle('hover:bg-red-600', isPlaying);
-                playButton.classList.toggle('focus:ring-red-500', isPlaying);
-                playButton.classList.toggle('bg-indigo-500', !isPlaying);
-                playButton.classList.toggle('hover:bg-indigo-600', !isPlaying);
-                playButton.classList.toggle('focus:ring-indigo-500', !isPlaying);
-            };
-
-            // Function to add a new instrument track row to the DOM
-            const addTrack = () => {
-                const trackId = `track-${trackIndex++}`;
-                const trackDiv = document.createElement('div');
-                trackDiv.id = trackId;
-                trackDiv.className = 'flex flex-col md:flex-row items-stretch md:items-center space-y-4 md:space-y-0 md:space-x-4 p-4 bg-gray-700 rounded-xl shadow-inner';
-
-                const instrumentSelectorContainer = document.createElement('div');
-                instrumentSelectorContainer.className = 'flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-2';
-
-                const instrumentSelector = document.createElement('select');
-                instrumentSelector.className = 'flex-none w-full md:w-32 p-2 bg-gray-600 text-gray-200 rounded-lg border border-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
-                for (const type in instrumentTypes) {
-                    const option = document.createElement('option');
-                    option.value = type;
-                    option.textContent = type;
-                    instrumentSelector.appendChild(option);
-                }
-
-                // Initial instrument setup
-                instrumentSelector.value = 'Piano';
-                const notesInput = document.createElement('textarea');
-                notesInput.value = defaultMelodies['Piano'];
-                instruments[trackId] = getInstrument(instrumentSelector.value);
-
-                // Add experimental tag if necessary
-                const experimentalTag = document.createElement('span');
-                experimentalTag.textContent = 'Experimental';
-                experimentalTag.className = 'px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full';
-                if (instrumentSelector.value === 'Synth' || instrumentSelector.value === 'Violin' || instrumentSelector.value === 'Cello' || instrumentSelector.value === 'Flute') {
-                    instrumentSelectorContainer.appendChild(experimentalTag);
-                }
-                
-                instrumentSelectorContainer.prepend(instrumentSelector);
-
-                notesInput.className = 'flex-grow w-full p-2 text-sm bg-gray-600 text-gray-200 rounded-lg border border-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors resize-none';
-                notesInput.rows = 2;
-                notesInput.placeholder = 'e.g., C4/4n, Eb4/8n';
-                
-                // Add change listener to update notes and instrument
-                instrumentSelector.addEventListener('change', (e) => {
-                    const selectedType = e.target.value;
-                    instruments[trackId] = getInstrument(selectedType);
-                    notesInput.value = defaultMelodies[selectedType] || '';
-                    
-                    // Update experimental tag
-                    const currentTag = instrumentSelectorContainer.querySelector('span');
-                    if (selectedType === 'Synth' || selectedType === 'Violin' || selectedType === 'Cello' || selectedType === 'Flute') {
-                        if (!currentTag) {
-                            instrumentSelectorContainer.appendChild(experimentalTag);
-                        }
-                    } else {
-                        if (currentTag) {
-                            currentTag.remove();
-                        }
-                    }
+            try {
+                const response = await fetch(API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSave)
                 });
 
-                const controlsDiv = document.createElement('div');
-                controlsDiv.className = 'flex-none flex justify-end space-x-2';
+                const result = await response.json();
 
-                const soloButton = document.createElement('button');
-                soloButton.textContent = 'Solo';
-                soloButton.className = 'px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-orange-500 hover:bg-orange-600 text-white';
-                soloButton.onclick = () => toggleSolo(trackId);
-
-                const muteButton = document.createElement('button');
-                muteButton.textContent = 'Mute';
-                muteButton.className = 'px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-red-500 hover:bg-red-600 text-white';
-                muteButton.onclick = () => toggleMute(trackId);
-                
-                // Add a delete track button
-                const deleteButton = document.createElement('button');
-                deleteButton.textContent = 'Delete';
-                deleteButton.className = 'px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-gray-500 hover:bg-gray-600 text-white';
-                deleteButton.onclick = () => deleteTrack(trackId);
-
-                controlsDiv.appendChild(soloButton);
-                controlsDiv.appendChild(muteButton);
-                controlsDiv.appendChild(deleteButton);
-
-                trackDiv.appendChild(instrumentSelectorContainer);
-                trackDiv.appendChild(notesInput);
-                trackDiv.appendChild(controlsDiv);
-
-                tracksContainer.appendChild(trackDiv);
-            };
-
-            const deleteTrack = (trackId) => {
-                const trackDiv = document.getElementById(trackId);
-                if (trackDiv) {
-                    tracksContainer.removeChild(trackDiv);
-                    // Dispose of the instrument if it's a Synth to free up resources
-                    if (instruments[trackId] instanceof Tone.PolySynth) {
-                        instruments[trackId].dispose();
-                    }
-                    delete instruments[trackId];
-                }
-            };
-
-
-            const toggleMute = (trackId) => {
-                const instrument = instruments[trackId];
-                const trackDiv = document.getElementById(trackId);
-                const muteButton = trackDiv.querySelector('button.bg-red-500, button.bg-gray-400');
-
-                if (instrument.volume.value === -Infinity) {
-                    instrument.volume.value = 0; // Unmute
-                    muteButton.textContent = 'Mute';
-                    muteButton.classList.remove('bg-gray-400');
-                    muteButton.classList.add('bg-red-500');
+                if (response.ok) {
+                    nameInput.value = '';
+                    console.log(`Composition "${name}" saved successfully! Server ID: ${result.id}`);
                 } else {
-                    instrument.volume.value = -Infinity; // Mute
-                    muteButton.textContent = 'Unmute';
-                    muteButton.classList.remove('bg-red-500');
-                    muteButton.classList.add('bg-gray-400');
+                    throw new Error(result.error || 'Unknown server error.');
                 }
-            };
+            } catch (e) {
+                console.error("Error saving composition: ", e);
+                console.warn("Failed to save composition. Check console for details.");
+            } finally {
+                saveButton.textContent = originalText;
+                saveButton.disabled = false;
+                loadCompositions(); // Refresh the load list after saving
+            }
+        };
 
-            const toggleSolo = (soloTrackId) => {
-                const tracks = tracksContainer.children;
-                const soloButton = document.getElementById(soloTrackId).querySelector('button.bg-orange-500, button.bg-yellow-500');
-                const isAlreadySoloed = soloButton.classList.contains('bg-yellow-500');
+        /**
+         * Fetches a list of saved compositions from the server and populates the load list.
+         */
+        window.loadCompositions = async () => {
+            const listContainer = document.getElementById('load-list-container');
+            listContainer.classList.remove('hidden');
+            listContainer.innerHTML = '<p class="text-gray-400">Fetching compositions...</p>';
 
-                for (let i = 0; i < tracks.length; i++) {
-                    const track = tracks[i];
-                    const trackId = track.id;
-                    const instrument = instruments[trackId];
-                    const currentSoloButton = track.querySelector('button.bg-orange-500, button.bg-yellow-500');
-                    const currentMuteButton = track.querySelector('button.bg-red-500, button.bg-gray-400');
+            try {
+                const response = await fetch(API_BASE_URL);
+                const compositions = await response.json();
 
-                    if (isAlreadySoloed) {
-                        // Un-solo all tracks
-                        instrument.volume.value = 0;
-                        currentSoloButton.textContent = 'Solo';
-                        currentSoloButton.classList.remove('bg-yellow-500');
-                        currentSoloButton.classList.add('bg-orange-500');
-                        currentMuteButton.textContent = 'Mute';
-                        currentMuteButton.classList.remove('bg-gray-400');
-                        currentMuteButton.classList.add('bg-red-500');
-                    } else {
-                        // Solo the selected track, mute others
-                        if (trackId === soloTrackId) {
-                            instrument.volume.value = 0;
-                            currentSoloButton.textContent = 'Soloed';
-                            currentSoloButton.classList.remove('bg-orange-500');
-                            currentSoloButton.classList.add('bg-yellow-500');
-                            currentMuteButton.textContent = 'Mute';
-                            currentMuteButton.classList.remove('bg-gray-400');
-                            currentMuteButton.classList.add('bg-red-500');
-                        } else {
-                            instrument.volume.value = -Infinity;
-                            currentSoloButton.textContent = 'Solo';
-                            currentSoloButton.classList.remove('bg-yellow-500');
-                            currentSoloButton.classList.add('bg-orange-500');
-                            currentMuteButton.textContent = 'Muted';
-                            currentMuteButton.classList.remove('bg-red-500');
-                            currentMuteButton.classList.add('bg-gray-400');
-                        }
-                    }
-                }
-            };
-
-            // === Event Handlers ===
-            const handlePlay = async () => {
-                if (isPlaying) {
-                    Tone.Transport.stop();
-                    Tone.Transport.cancel();
-                    isPlaying = false;
-                    messageDisplay.textContent = 'Stopped.';
-                    updateUI();
+                if (compositions.length === 0) {
+                    listContainer.innerHTML = '<p class="text-gray-400">No saved compositions found on server.</p>';
                     return;
                 }
 
-                if (Tone.context.state !== 'running') {
-                    await Tone.start();
-                }
-
-                try {
-                    isPlaying = true;
-                    updateUI();
-                    messageDisplay.textContent = 'Playing...';
-
-                    Tone.Transport.stop();
-                    Tone.Transport.cancel();
-
-                    Tone.Transport.bpm.value = parseInt(tempoInput.value, 10);
-                    let longestTrackDuration = 0;
+                listContainer.innerHTML = '';
+                compositions.forEach((data) => {
+                    const item = document.createElement('div');
+                    item.className = 'flex justify-between items-center p-2 my-1 rounded-lg bg-[#3e3d64] hover:bg-[#4a488e] transition';
                     
-                    const tracks = tracksContainer.children;
-                    if (tracks.length === 0) {
-                        messageDisplay.textContent = 'Add a track to play!';
-                        isPlaying = false;
-                        updateUI();
-                        return;
-                    }
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = `${data.name} (ID: ${data.id})`;
+                    nameSpan.className = 'truncate pr-2';
+                    item.appendChild(nameSpan);
 
-                    // Process each track
-                    for (const track of tracks) {
-                        const trackId = track.id;
-                        const notesInput = track.querySelector('textarea');
-                        const notes = notesInput.value.split(',').map(note => note.trim());
-                        const instrument = instruments[trackId];
-                        let currentTime = 0;
+                    const actionDiv = document.createElement('div');
+                    actionDiv.className = 'flex gap-2';
+                    
+                    const loadBtn = document.createElement('button');
+                    loadBtn.textContent = 'Load';
+                    loadBtn.className = 'text-sm bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded';
+                    loadBtn.onclick = () => loadCompositionById(data.id);
+                    actionDiv.appendChild(loadBtn);
 
-                        notes.forEach((noteString) => {
-                            if (noteString) {
-                                const parts = noteString.split('/');
-                                const note = parts[0];
-                                const duration = parts[1] || '4n';
-                                
-                                Tone.Transport.scheduleOnce(time => {
-                                    instrument.triggerAttackRelease(note, duration, time);
-                                }, currentTime);
-                                
-                                currentTime += Tone.Time(duration).toSeconds();
-                            }
-                        });
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'text-sm bg-red-500 hover:bg-red-600 px-3 py-1 rounded';
+                    deleteBtn.onclick = () => deleteComposition(data.id, data.name);
+                    actionDiv.appendChild(deleteBtn);
 
-                        if (currentTime > longestTrackDuration) {
-                            longestTrackDuration = currentTime;
-                        }
-                    }
+                    item.appendChild(actionDiv);
+                    listContainer.appendChild(item);
+                });
 
-                    Tone.Transport.scheduleOnce(() => {
-                        isPlaying = false;
-                        messageDisplay.textContent = 'Playback finished.';
-                        updateUI();
-                    }, longestTrackDuration);
+            } catch (e) {
+                console.error("Error loading compositions: ", e);
+                listContainer.innerHTML = '<p class="text-red-400">Failed to connect to server API. Is Node.js server running?</p>';
+            }
+        };
 
-                    Tone.Transport.start();
-
-                } catch (error) {
-                    console.error("Error playing notes:", error);
-                    messageDisplay.textContent = `Error: Invalid notes format. Please check your input.`;
-                    isPlaying = false;
-                    updateUI();
+        /**
+         * Fetches the full track data for a single composition by ID from the server.
+         */
+        async function loadCompositionById(compositionId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${compositionId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    loadTrackData(data.tracks);
+                    document.getElementById('composition-name').value = data.name; // Set the name input
+                    console.log(`Composition ID ${compositionId} loaded.`);
+                } else {
+                    throw new Error(data.error || 'Failed to fetch composition details.');
                 }
-            };
-            
-            // Attach event listeners
-            playButton.addEventListener('click', handlePlay);
-            addTrackButton.addEventListener('click', addTrack);
+            } catch (e) {
+                console.error("Error loading track data:", e);
+                console.warn("Failed to load composition.");
+            }
+        }
 
-            // Initial UI setup
-            await createSamplers(); // Start pre-loading samplers
-            addTrack(); // Add one track by default on page load
-            updateUI();
-        });
+        /**
+         * Sends a DELETE request to the server to remove a composition.
+         */
+        async function deleteComposition(compositionId, name) {
+            // NOTE: Using window.confirm() for simplicity, but a custom modal is preferred
+            if (window.confirm(`Are you sure you want to delete "${name}" (ID: ${compositionId})?`)) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/${compositionId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        console.log(result.message);
+                        loadCompositions(); // Refresh the list
+                    } else {
+                        throw new Error(result.error || 'Failed to delete on server.');
+                    }
+                } catch (e) {
+                    console.error("Error deleting composition: ", e);
+                    console.warn("Failed to delete composition.");
+                }
+            }
+        }
+
+        /**
+         * Clears the current tracks and rebuilds them based on loaded JSON data.
+         */
+        function loadTrackData(tracksJson) {
+            try {
+                const tracksData = JSON.parse(tracksJson);
+                
+                // 1. Clear existing tracks
+                window.tracks.forEach(track => removeTrack(track.id, false));
+                window.tracks = [];
+                document.getElementById('tracks-container').innerHTML = '';
+                
+                // 2. Load new tracks
+                tracksData.forEach(data => {
+                    // Re-add track using saved properties
+                    window.addTrack(data.instrumentType, data.notation, data.volume);
+                });
+
+                console.log("Composition loaded successfully!");
+            } catch (e) {
+                console.error("Error parsing or loading tracks data: ", e);
+                console.warn("Failed to load track data. Data format error.");
+            }
+        }
+
+
+        // ----------------------------------------------------------------------
+        // 2. TONE.JS INSTRUMENT LOGIC (FIXED LOADING)
+        // ----------------------------------------------------------------------
+
+        let initialized = false;
+        let samplerLoadedCount = 0;
+        // Total number of sampler assets we expect to preload (4 Samplers = 4 completion events)
+        const totalSamplers = 4; 
+
+        window.tracks = []; // Global array to hold track objects {id, instrument, part, instrumentType, instrumentName}
+
+        const instrumentSettings = {
+            'Piano': { type: 'Sampler', samples: { 'A1': 'A1.mp3', 'A2': 'A2.mp3', 'B1': 'B1.mp3' }, baseUrl: "https://tonejs.github.io/audio/salamander/", defaultNotation: "C4, 8n, 0; E4, 8n, +4n; G4, 8n, +4n; C5, 8n, +4n", instrumentName: "Piano (Sampled)" },
+            'Drums': { type: 'Sampler', samples: { "C1": "kick.mp3", "D1": "snare.mp3", "E1": "hihat.mp3" }, baseUrl: "https://tonejs.github.io/audio/drum-samples/acoustic-kit/", defaultNotation: "C1, 4n, 0; D1, 4n, +4n; E1, 4n, +2n", instrumentName: "Drums (Sampled)" },
+            'Gong': { type: 'Sampler', samples: { "C2": "C2.mp3" }, baseUrl: "https://tonejs.github.io/audio/gong/", defaultNotation: "C2, 1m, 0", instrumentName: "Gong (Sampled)" },
+            'Organ': { type: 'Sampler', samples: { 'C3': 'C3.mp3', 'E3': 'E3.mp3', 'G3': 'G3.mp3' }, baseUrl: 'https://tonejs.github.io/audio/salamander/', defaultNotation: "C3, 4n, 0; E3, 4n, +4n; G3, 4n, +4n; C4, 4n, +4n", instrumentName: "Organ (Sampled)" },
+            'Synth': { type: 'Synth', defaultNotation: "C4, 4n, 0; E4, 4n, +4n; G4, 4n, +4n; C5, 4n, +4n", instrumentName: "Synth (Experimental)" },
+            'Violin': { type: 'PolySynth', defaultNotation: "C4, 4n, 0; E4, 4n, +4n; G4, 4n, +4n; C5, 4n, +4n", instrumentName: "Violin (Experimental)" },
+            'Cello': { type: 'PolySynth', defaultNotation: "C3, 4n, 0; E3, 4n, +4n; G3, 4n, +4n; C4, 4n, +4n", instrumentName: "Cello (Experimental)" },
+            'Flute': { type: 'FMSynth', defaultNotation: "C5, 4n, 0; E5, 4n, +4n; G5, 4n, +4n; C6, 4n, +4n", instrumentName: "Flute (Experimental)" },
+        };
+
+        /**
+         * Increments the loading counter and updates the UI.
+         * Only called for the initial preload Sampler instances.
+         */
+        function incrementSamplerLoad() {
+            samplerLoadedCount++;
+            // Ensure the percentage never exceeds 100%
+            const percent = Math.min(100, Math.floor((samplerLoadedCount / totalSamplers) * 100));
+            document.getElementById('start-text').textContent = `Loading Instruments... ${percent}%`;
+
+            if (samplerLoadedCount >= totalSamplers && !initialized) {
+                initialized = true;
+                document.getElementById('loader-icon').classList.add('hidden');
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-text').textContent = 'Play';
+                document.getElementById('stop-btn').disabled = false;
+                Tone.Transport.bpm.value = 120; // Set default tempo
+                
+                // Add default tracks AFTER initialization is complete
+                addTrack('Piano');
+                addTrack('Drums');
+            }
+        }
+
+        /**
+         * Creates a temporary Sampler instance purely for preloading the audio files.
+         * The instance is disposed immediately after loading to free memory.
+         * This prevents the recursive calling of the load counter.
+         */
+        function createPreloadSampler(instrumentType) {
+             const settings = instrumentSettings[instrumentType];
+             if (!settings) return; // Should not happen
+
+             new Tone.Sampler({
+                urls: settings.samples,
+                baseUrl: settings.baseUrl,
+                onload: function() {
+                    this.dispose(); // Dispose of the preloader instance
+                    incrementSamplerLoad();
+                },
+                onerror: (error) => {
+                    console.error(`Error loading ${instrumentType} sample:`, error);
+                    this.dispose(); // Dispose even on error
+                    incrementSamplerLoad(); // Count the attempt to load as completed
+                }
+            }).toDestination();
+            // Note: We don't return this instance, as it's just for loading.
+        }
+
+
+        /**
+         * Creates a NEW instrument instance for playback (called by addTrack).
+         */
+        function createInstrument(instrumentType) {
+            switch (instrumentType) {
+                case 'Piano':
+                case 'Drums':
+                case 'Gong':
+                case 'Organ':
+                    const settings = instrumentSettings[instrumentType];
+                    // Samplers are created without an onload/onerror handler here, 
+                    // as the assets are expected to be preloaded.
+                    const sampler = new Tone.Sampler({
+                        urls: settings.samples,
+                        baseUrl: settings.baseUrl
+                    }).toDestination();
+                    return sampler;
+                case 'Synth':
+                    return new Tone.Synth({
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+                    }).toDestination();
+                case 'Violin':
+                case 'Cello':
+                    return new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.5 }
+                    }).toDestination();
+                case 'Flute':
+                    return new Tone.FMSynth({
+                        harmonicity: 3.0,
+                        modulationIndex: 10,
+                        oscillator: { type: 'sine' },
+                        envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.8 }
+                    }).toDestination();
+                default:
+                    console.error("Unknown instrument type:", instrumentType);
+                    return new Tone.Synth().toDestination();
+            }
+        }
+
+        window.addTrack = (instrumentType, initialNotation = null, initialVolume = 0) => {
+            const settings = instrumentSettings[instrumentType];
+            if (!settings) return;
+
+            const instrument = createInstrument(instrumentType);
+            const trackId = Date.now();
+            const notation = initialNotation !== null ? initialNotation : settings.defaultNotation;
+            const volume = initialVolume;
+
+            instrument.volume.value = parseFloat(volume);
+
+            const trackPart = new Tone.Part((time, note) => {
+                if (instrumentType === 'Drums' || instrumentType === 'Gong') {
+                    instrument.triggerAttackRelease(note.note, note.duration, time);
+                } else {
+                    instrument.triggerAttackRelease(note.note, note.duration, time);
+                }
+            }, parseNotation(notation)).start(0);
+
+            const newTrack = {
+                id: trackId,
+                instrument: instrument,
+                part: trackPart,
+                instrumentType: instrumentType,
+                instrumentName: settings.instrumentName,
+            };
+
+            window.tracks.push(newTrack);
+            renderTrackCard(newTrack, notation, volume);
+            updateTransportLoop();
+        };
+
+        window.removeTrack = (trackId, shouldConfirm = true) => {
+            if (shouldConfirm && !confirm("Are you sure you want to delete this track?")) {
+                return;
+            }
+
+            const index = window.tracks.findIndex(t => t.id === trackId);
+            if (index > -1) {
+                const track = window.tracks[index];
+                track.part.dispose();
+                track.instrument.dispose();
+                window.tracks.splice(index, 1);
+                document.getElementById(`track-card-${trackId}`).remove();
+                updateTransportLoop();
+            }
+        };
+
+        function renderTrackCard(track, notation, volume) {
+            const container = document.getElementById('tracks-container');
+            const isExperimental = track.instrumentName.includes('(Experimental)');
+            
+            const cardHtml = `
+                <div id="track-card-${track.id}" class="card p-4 rounded-xl flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xl font-semibold flex items-center">
+                            ${track.instrumentType}
+                            ${isExperimental ? `<span class="experimental-tag">Experimental</span>` : ''}
+                        </h3>
+                        <button onclick="removeTrack(${track.id})" 
+                                class="btn-danger p-2 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
+                            &times;
+                        </button>
+                    </div>
+                    
+                    <label class="text-sm font-medium mb-1 text-gray-400">Volume</label>
+                    <input type="range" id="volume-${track.id}" min="-30" max="0" value="${volume}" 
+                           oninput="updateVolume(${track.id}, this.value)"
+                           class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                           <span class="text-xs text-gray-500 mb-3">${volume} dB</span>
+                    
+                    <label for="notation-${track.id}" class="text-sm font-medium mb-1 text-gray-400">Notation (Note, Duration, Time)</label>
+                    <textarea id="notation-${track.id}" 
+                              oninput="updatePart(${track.id}, this.value)"
+                              class="notation-area input-style p-2 rounded-lg text-xs" 
+                              placeholder="e.g., C4, 8n, 0; E4, 8n, +4n">${notation}</textarea>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        }
+
+        // Parse notation from textarea into an array of Tone.js events
+        function parseNotation(text) {
+            const notes = [];
+            const lines = text.split(';');
+            lines.forEach(line => {
+                const parts = line.trim().split(',').map(p => p.trim());
+                if (parts.length >= 3) {
+                    notes.push({ note: parts[0], duration: parts[1], time: parts[2] });
+                }
+            });
+            return notes;
+        }
+
+        window.updateVolume = (trackId, value) => {
+            const track = window.tracks.find(t => t.id === trackId);
+            if (track) {
+                track.instrument.volume.value = parseFloat(value);
+            }
+        };
+
+        window.updatePart = (trackId, notationText) => {
+            const track = window.tracks.find(t => t.id === trackId);
+            if (track) {
+                track.part.dispose(); 
+                track.part = new Tone.Part((time, note) => {
+                    if (track.instrumentType === 'Drums' || track.instrumentType === 'Gong') {
+                         track.instrument.triggerAttackRelease(note.note, note.duration, time);
+                    } else {
+                        track.instrument.triggerAttackRelease(note.note, note.duration, time);
+                    }
+                }, parseNotation(notationText)).start(0);
+                updateTransportLoop(); 
+            }
+        };
+
+        function updateTransportLoop() {
+            Tone.Transport.loopEnd = "1m"; 
+            Tone.Transport.loop = true;
+        }
+
+        // ----------------------------------------------------------------------
+        // 3. TRANSPORT CONTROLS
+        // ----------------------------------------------------------------------
+
+        window.startTransport = () => {
+            if (Tone.Transport.state !== 'started') {
+                Tone.Transport.start();
+                document.getElementById('start-text').textContent = 'Pause';
+                document.getElementById('start-btn').classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                document.getElementById('start-btn').classList.remove('btn-primary');
+            } else {
+                Tone.Transport.pause();
+                document.getElementById('start-text').textContent = 'Play';
+                document.getElementById('start-btn').classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                document.getElementById('start-btn').classList.add('btn-primary');
+            }
+        };
+
+        window.stopTransport = () => {
+            Tone.Transport.stop();
+            document.getElementById('start-text').textContent = 'Play';
+            document.getElementById('start-btn').classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+            document.getElementById('start-btn').classList.add('btn-primary');
+        };
+
+        // ----------------------------------------------------------------------
+        // 4. INITIALIZATION
+        // ----------------------------------------------------------------------
+
+        window.onload = () => {
+            // Trigger preloading for the 4 Samplers. 
+            // The createPreloadSampler function handles the counting and final initialization.
+            ['Piano', 'Drums', 'Gong', 'Organ'].forEach(type => {
+                createPreloadSampler(type);
+            });
+        };
     </script>
 </body>
 </html>
