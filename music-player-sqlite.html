@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full-Stack Music Notes Player</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Tone.js for web audio synthesis -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.58/build/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #E0E0E0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background-color: #1E1E1E;
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+        }
+        .header {
+            color: #4A90E2;
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        input, select, textarea {
+            background-color: #2D2D2D;
+            border: 1px solid #444;
+            color: #E0E0E0;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            transition: border-color 0.3s;
+        }
+        /* Style for disabled inputs in read-only mode */
+        input:disabled, select:disabled, textarea:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            color: #B0B0B0;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4A90E2;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #B0B0B0;
+        }
+        .btn {
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+        }
+        #playBtn {
+            background-color: #6DD400; /* Green */
+            color: #121212;
+        }
+        #saveBtn {
+            background-color: #8A2BE2; /* Purple */
+            color: white;
+        }
+        #loadBtn {
+            background-color: #FFA500; /* Orange */
+            color: #121212;
+        }
+        /* Message Box Styling */
+        #messageBox {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            z-index: 1000;
+        }
+        #messageBox.show {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+    <!-- Message Box for alerts/errors -->
+    <div id="messageBox"></div>
+
+    <div class="container">
+        <!-- Composition ID Display (New Element) -->
+        <div class="relative mb-6">
+            <h1 class="header">Full-Stack Music Notes Player</h1>
+            <div id="compositionIdDisplay" class="absolute top-0 right-0 text-sm font-bold text-yellow-400 bg-gray-700 py-1 px-3 rounded-full shadow-lg">
+                ID: <span id="currentIdValue" class="text-white ml-1">N/A</span>
+            </div>
+        </div>
+        
+        <p id="modeText" class="text-center text-sm mb-6 text-gray-400">
+            Sequence notes, choose an instrument, and click Save to generate a shareable ID.
+        </p>
+
+        <div class="space-y-4">
+            <!-- Composition ID input is REMOVED -->
+
+            <div>
+                <label for="compositionName">Composition Name</label>
+                <input type="text" id="compositionName" value="My New Melody" placeholder="Enter composition name">
+            </div>
+            
+            <div>
+                <label for="notesInput">Notes (Space separated: C4 E4 G4 C5)</label>
+                <textarea id="notesInput" rows="3" placeholder="e.g., C4 E4 G4 C5 F5"></textarea>
+            </div>
+
+            <div>
+                <label for="instrumentSelect">Instrument</label>
+                <select id="instrumentSelect">
+                    <option value="default">Default Synth (Fast)</option>
+                    <option value="am">AM Synth (Plucky)</option>
+                    <option value="fm">FM Synth (Bassy)</option>
+                </select>
+            </div>
+
+            <div id="editButtons" class="flex space-x-4 pt-4">
+                <button id="saveBtn" class="btn flex-1 flex items-center justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                    </svg>
+                    <span>Save & Generate ID</span>
+                </button>
+                <button id="loadBtn" class="btn flex-1 flex items-center justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Load By ID</span>
+                </button>
+            </div>
+            <div class="pt-2">
+                <button id="playBtn" class="btn w-full">Play</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Global State and Constants ---
+        const SERVER_URL = '/api'; 
+        let currentCompositionId = null; // Stores the ID of the currently loaded/saved composition
+        let isReadOnlyMode = false;
+
+        // --- UI Elements ---
+        const notesInput = document.getElementById('notesInput');
+        const compositionNameInput = document.getElementById('compositionName');
+        const instrumentSelect = document.getElementById('instrumentSelect');
+        const playBtn = document.getElementById('playBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const messageBox = document.getElementById('messageBox');
+        const currentIdValue = document.getElementById('currentIdValue');
+        const editButtonsDiv = document.getElementById('editButtons');
+        const modeText = document.getElementById('modeText');
+
+        // --- Utility Functions ---
+
+        /**
+         * Generates a random 6-character ID (uppercase letters).
+         * @returns {string} The generated ID.
+         */
+        function generateRandomId() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        /**
+         * Updates the displayed ID and the currentCompositionId variable.
+         * NOTE: Browser history manipulation (pushState) has been removed to avoid SecurityErrors.
+         * @param {string} newId - The new composition ID.
+         */
+        function updateCurrentId(newId) {
+            currentCompositionId = newId.toUpperCase();
+            currentIdValue.textContent = currentCompositionId;
+        }
+
+        /**
+         * Sets the application to read-only or edit mode based on whether a shared ID was loaded.
+         * @param {boolean} readOnly - True to enable read-only, false otherwise (edit mode).
+         */
+        function setReadOnlyMode(readOnly) {
+            isReadOnlyMode = readOnly;
+            
+            // Disable/Enable Input Fields
+            notesInput.disabled = readOnly;
+            compositionNameInput.disabled = readOnly;
+            instrumentSelect.disabled = readOnly;
+            
+            // Hide/Show Edit Buttons
+            editButtonsDiv.style.display = readOnly ? 'none' : 'flex';
+
+            // Update status text
+            if (readOnly) {
+                modeText.textContent = 'Read-Only Mode: Composition loaded from the initial path. Press Play to listen.';
+                modeText.classList.add('text-yellow-400');
+                showMessage('Read-Only Mode Activated.', 'success');
+            } else {
+                modeText.textContent = 'Sequence notes, choose an instrument, and click Save to generate a shareable ID.';
+                modeText.classList.remove('text-yellow-400');
+                currentIdValue.textContent = 'N/A (Unsaved)';
+            }
+        }
+        
+        // --- Audio Engine Setup (Tone.js) ---
+        let synth; 
+        let sequence;
+
+        /**
+         * Creates and replaces the Tone.js synthesizer.
+         * @param {string} type - 'default', 'am', or 'fm'.
+         * @returns {Tone.Synth | Tone.AMSynth | Tone.FMSynth} The new synth instance.
+         */
+        function createSynth(type) {
+            if (synth) synth.dispose(); 
+            let newSynth;
+            switch (type) {
+                case 'am':
+                    newSynth = new Tone.AMSynth().toDestination();
+                    newSynth.volume.value = -10;
+                    break;
+                case 'fm':
+                    newSynth = new Tone.FMSynth().toDestination();
+                    newSynth.volume.value = -15;
+                    break;
+                case 'default':
+                default:
+                    newSynth = new Tone.Synth().toDestination();
+                    break;
+            }
+            return newSynth;
+        }
+
+        synth = createSynth('default'); 
+
+        /**
+         * Parses notes and schedules the Tone.js sequence.
+         */
+        function scheduleSequence() {
+            if (sequence) sequence.dispose(); 
+            
+            const notes = notesInput.value.split(/\s+/).filter(note => note.length > 0);
+            
+            if (notes.length === 0) return;
+
+            const noteDuration = '4n'; // Quarter note duration
+            
+            const events = notes.map((note, index) => ({
+                time: `0:${index}`, // Schedule in a measure/beat format
+                note: note
+            }));
+
+            // Create a new sequence that triggers the synth for each note
+            sequence = new Tone.Sequence((time, event) => {
+                synth.triggerAttackRelease(event.note, noteDuration, time);
+            }, events, noteDuration).start(0);
+
+            Tone.Transport.bpm.value = 120;
+            sequence.loop = true;
+            sequence.loopEnd = events.length * Tone.Time(noteDuration).toSeconds(); 
+        }
+
+        /**
+         * Core logic for starting/stopping playback.
+         */
+        function togglePlayback() {
+            // First, ensure AudioContext is running
+            if (Tone.context.state !== 'running') {
+                Tone.context.resume().then(() => {
+                    startPlaybackLogic();
+                }).catch(err => {
+                    showMessage('Audio failed to start: ' + err.message, 'error');
+                });
+            } else {
+                startPlaybackLogic();
+            }
+        }
+
+        /**
+         * Handles Tone.Transport start/stop state.
+         */
+        function startPlaybackLogic() {
+            if (Tone.Transport.state !== 'started') {
+                // Ensure the sequence is current before playing
+                scheduleSequence(); 
+                Tone.Transport.start();
+                playBtn.textContent = 'Stop';
+                playBtn.classList.remove('bg-[#6DD400]');
+                playBtn.classList.add('bg-[#D40000]'); 
+            } else {
+                Tone.Transport.stop();
+                playBtn.textContent = 'Play';
+                playBtn.classList.remove('bg-[#D40000]');
+                playBtn.classList.add('bg-[#6DD400]'); 
+            }
+        }
+
+        // --- Server Communication (Save/Load) ---
+
+        /**
+         * Displays a temporary message in the message box.
+         * @param {string} message - The message content.
+         * @param {'success' | 'error'} type - The type of message.
+         */
+        function showMessage(message, type = 'success') {
+            messageBox.textContent = message;
+            messageBox.className = 'show'; 
+            
+            if (type === 'success') {
+                messageBox.style.backgroundColor = '#4CAF50'; 
+            } else if (type === 'error') {
+                messageBox.style.backgroundColor = '#f44336'; 
+            } else {
+                messageBox.style.backgroundColor = '#333';
+            }
+
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 5000); // Increased duration for the link display
+        }
+
+        /**
+         * Generates a new ID, saves the composition, and updates the UI.
+         */
+        async function saveComposition() {
+            if (isReadOnlyMode) return; 
+
+            // 1. Generate new ID (or reuse existing ID if previously saved)
+            const newId = currentCompositionId || generateRandomId();
+            
+            const compositionData = {
+                id: newId, 
+                name: compositionNameInput.value.trim(),
+                tracks: notesInput.value.trim()
+            };
+
+            if (!compositionData.name || !compositionData.tracks) {
+                showMessage('Please fill in Composition Name and Notes.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${SERVER_URL}/save`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(compositionData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Server returned error status.' }));
+                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                updateCurrentId(result.id); // Update the UI with the new ID
+                
+                // --- FIX for URL not updating: Display the shareable link instead ---
+                // Note: The structure of the actual URL is determined by the server/host environment. 
+                // We use the ID as the path segment for instruction.
+                const shareableLink = `[App URL]/[your-app-path]/${result.id}`;
+                showMessage(`Composition saved successfully! Share this ID: ${result.id}. (Shareable link format: ${shareableLink})`, 'success');
+
+            } catch (error) {
+                console.error('Error saving composition:', error);
+                showMessage(`Save failed: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * Loads a composition based on the given ID.
+         * @param {string} idToLoad - The ID to fetch.
+         */
+        async function loadComposition(idToLoad) {
+            const id = idToLoad.toUpperCase().trim();
+            if (!id) return;
+            
+            // Update the display immediately
+            currentIdValue.textContent = id; 
+
+            try {
+                const response = await fetch(`${SERVER_URL}/load/${id}`, { method: 'GET' });
+
+                if (response.status === 404) {
+                    showMessage(`Composition with ID ${id} not found.`, 'error');
+                    // If in read-only mode, stop and display error status
+                    if (isReadOnlyMode) {
+                        Tone.Transport.stop();
+                        currentIdValue.textContent = 'NOT FOUND';
+                        playBtn.textContent = 'Play';
+                    } else {
+                        currentIdValue.textContent = 'N/A (Unsaved)';
+                    }
+                    return;
+                }
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Server returned error status.' }));
+                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                }
+
+                const composition = await response.json();
+                
+                compositionNameInput.value = composition.name;
+                notesInput.value = composition.tracks;
+
+                // Stop current playback if running before loading new data
+                if (Tone.Transport.state === 'started') {
+                    togglePlayback();
+                }
+                
+                // Re-initialize the sequence and update UI
+                scheduleSequence();
+                
+                // Update the current ID display
+                updateCurrentId(composition.id);
+                
+                showMessage(`Composition "${composition.name}" loaded!`, 'success');
+
+            } catch (error) {
+                console.error('Error loading composition:', error);
+                showMessage(`Load failed: ${error.message}`, 'error');
+            }
+        }
+
+        // --- Event Listeners ---
+        playBtn.addEventListener('click', togglePlayback);
+        saveBtn.addEventListener('click', saveComposition);
+
+        loadBtn.addEventListener('click', () => {
+            // Manual load function, only available in edit mode
+            if (isReadOnlyMode) return;
+            const idPrompt = prompt("Enter the 6-character Composition ID to load:");
+            if (idPrompt && idPrompt.length === 6) {
+                loadComposition(idPrompt);
+            } else if (idPrompt) {
+                 showMessage('Invalid ID length. Must be 6 characters.', 'error');
+            }
+        });
+        
+        instrumentSelect.addEventListener('change', (e) => {
+            // Recreate synth with new selection
+            synth = createSynth(e.target.value);
+            // If playing, we need to stop and wait for a new play click
+            if (Tone.Transport.state === 'started') {
+                Tone.Transport.stop();
+                playBtn.textContent = 'Play';
+                playBtn.classList.remove('bg-[#D40000]');
+                playBtn.classList.add('bg-[#6DD400]');
+            }
+        });
+
+        window.onload = () => {
+             // window.initialCompositionId is injected by the server.js file if an ID is in the URL (e.g., /TEST).
+             if (window.initialCompositionId) {
+                setReadOnlyMode(true);
+                loadComposition(window.initialCompositionId); // Auto-load the shared composition
+             } else {
+                // Default Edit Mode
+                setReadOnlyMode(false);
+                notesInput.value = 'C4 E4 G4 C5 F5';
+             }
+        };
+
+    </script>
+</body>
+</html>
